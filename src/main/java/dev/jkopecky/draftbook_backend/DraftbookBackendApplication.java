@@ -10,4 +10,7 @@ public class DraftbookBackendApplication {
         SpringApplication.run(DraftbookBackendApplication.class, args);
     }
 
+    public static String retrieveRoot() {
+        return System.getProperty("user.home") + "draftbook_data/";
+    }
 }
