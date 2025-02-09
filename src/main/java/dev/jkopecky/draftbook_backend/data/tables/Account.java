@@ -40,7 +40,7 @@ public class Account {
 
     public static Account authenticate(String username, String password, AccountRepository repo) {
         for (Account account : repo.findAll()) {
-            if (account.getUsername().equals(username) && account.getPassword().equals(password)) {
+            if (account.getUsername().equals(username) && account.getPassword().equals(password)) { //todo secure authentication
                 return account;
             }
         }
