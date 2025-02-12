@@ -6,7 +6,6 @@ import dev.jkopecky.draftbook_backend.Log;
 import dev.jkopecky.draftbook_backend.data.Util;
 import jakarta.persistence.*;
 
-import javax.naming.NameAlreadyBoundException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;

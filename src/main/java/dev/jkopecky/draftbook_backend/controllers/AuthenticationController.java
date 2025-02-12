@@ -5,18 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.jkopecky.draftbook_backend.Log;
 import dev.jkopecky.draftbook_backend.data.tables.Account;
 import dev.jkopecky.draftbook_backend.data.tables.AccountRepository;
-import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 
-import javax.naming.AuthenticationException;
 import java.util.HashMap;
 
 @Controller

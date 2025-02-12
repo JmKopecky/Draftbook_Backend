@@ -1,6 +1,5 @@
 package dev.jkopecky.draftbook_backend.data.tables;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.jkopecky.draftbook_backend.DraftbookBackendApplication;
 import dev.jkopecky.draftbook_backend.Log;
 import dev.jkopecky.draftbook_backend.data.Util;
