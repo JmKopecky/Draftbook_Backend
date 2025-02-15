@@ -67,7 +67,7 @@ public class NoteController {
         //retrieve work
         ArrayList<Work> works = account.getOwnedWorks(workRepository);
         for (Work work : works) {
-            if (Util.toInternalResource(work.getTitle()).equals(target)) {
+            if (work.toResource().equals(target)) {
                 //found the work
                 return work;
             }
@@ -115,7 +115,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName}
     @PostMapping("/api/works/notecategories/create")
     public ResponseEntity<HashMap<String, Object>> createCategory(
             @RequestParam(name = "target") String target,
@@ -161,7 +161,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName}
     @PostMapping("/api/works/notecategories/rename")
     public ResponseEntity<HashMap<String, Object>> renameCategory(
             @RequestParam(name = "target") String target,
@@ -203,7 +203,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName}
     @PostMapping("/api/works/notecategories/delete")
     public ResponseEntity<HashMap<String, Object>> deleteCategory(
             @RequestParam(name = "target") String target,
@@ -271,7 +271,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName, noteName}
     @PostMapping("/api/works/notes/create")
     public ResponseEntity<HashMap<String, Object>> createNote(
             @RequestParam(name = "target") String target,
@@ -327,7 +327,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName, noteName}
     @PostMapping("/api/works/notes/select")
     public ResponseEntity<HashMap<String, Object>> selectNote(
             @RequestParam(name = "target") String target,
@@ -371,7 +371,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName, noteName, newNoteName}
     @PostMapping("/api/works/notes/rename")
     public ResponseEntity<HashMap<String, Object>> renameNote(
             @RequestParam(name = "target") String target,
@@ -432,7 +432,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName, noteName}
     @PostMapping("/api/works/notes/save")
     public ResponseEntity<HashMap<String, Object>> saveNote(
             @RequestParam(name = "target") String target,
@@ -476,7 +476,7 @@ public class NoteController {
 
 
 
-
+    //note: inputs {noteCategoryName, noteName}
     @PostMapping("/api/works/notes/delete")
     public ResponseEntity<HashMap<String, Object>> deleteNote(
             @RequestParam(name = "target") String target,

@@ -1,5 +1,6 @@
 package dev.jkopecky.draftbook_backend.data.tables;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.jkopecky.draftbook_backend.DraftbookBackendApplication;
 import dev.jkopecky.draftbook_backend.Log;
 import dev.jkopecky.draftbook_backend.data.Util;
@@ -32,7 +33,7 @@ public class Chapter implements Comparable<Chapter> {
 
 
     public void buildPath() {
-        path = DraftbookBackendApplication.retrieveRoot() + Util.toInternalResource(work.getAccount().getUsername()) + "/works/" + Util.toInternalResource(work.getTitle()) + "/chapters/";
+        path = work.getPath() + "chapters/";
     }
 
 
@@ -100,15 +101,80 @@ public class Chapter implements Comparable<Chapter> {
 
 
     public boolean delete(ChapterRepository chapterRepository) {
-        //todo implement;
-        return false;
+        File backupFile = new File(path + "chapter_" + Util.toInternalResource(title) + ".json");
+        File htmlFile = new File(path + "chapter_" + Util.toInternalResource(title) + ".txt");
+        File noteFile = new File(path + "note_" + Util.toInternalResource(title) + ".txt");
+        try {
+            backupFile.delete();
+            htmlFile.delete();
+            noteFile.delete();
+            chapterRepository.delete(this);
+        } catch (Exception e) {
+            Log.create(e.getMessage(), "Chapter.delete()", "error", e);
+            return false;
+        }
+        return true;
     }
 
 
 
     public boolean rename(String name, ChapterRepository chapterRepository) {
-        //todo implement;
-        return false;
+        File newHtmlFile = new File(path + "chapter_" + Util.toInternalResource(name) + ".txt");
+        File newNoteFile = new File(path + "note_" + Util.toInternalResource(name) + ".txt");
+
+        //check if this name is already in use
+        if (newHtmlFile.isFile() || newNoteFile.isFile() || name.equals(this.title)) {
+            // title already in use by either this or another chapter, do not change.
+            Log.create("Attempted to rename chapter " + this.title + " to a name " + name + " that already exists", "Chapter.rename()", "info", null);
+            return false;
+        }
+
+        //transfer content to new files
+        try {
+            File oldHtmlFile = new File(path + "note_" + Util.toInternalResource(getTitle()) + ".txt");
+            FileWriter fileWriter = new FileWriter(newHtmlFile);
+            fileWriter.write(Files.readString(oldHtmlFile.toPath()));
+            fileWriter.close();
+        } catch (IOException e) {
+            Log.create("Error while transferring HTML content to new file", "Chapter.rename()", "info", null);
+            newHtmlFile.delete();
+            return false;
+        }
+
+        try {
+            File oldNotesFile = new File(path + "chapter_" + Util.toInternalResource(getTitle()) + ".txt");
+            FileWriter fileWriter = new FileWriter(newNoteFile);
+            fileWriter.write(Files.readString(oldNotesFile.toPath()));
+            fileWriter.close();
+        } catch (IOException e) {
+            Log.create("Error while transferring note content to new file", "Chapter.rename()", "info", null);
+            newHtmlFile.delete();
+            newNoteFile.delete();
+            return false;
+        }
+
+        String oldTitle = title;
+        title = name;
+
+        //write to data backup file
+        ObjectMapper mapper = new ObjectMapper();
+        File newDataBackup = new File(path + "chapter_" + Util.toInternalResource(name) + ".json");
+        try {
+            mapper.writeValue(newDataBackup, this);
+            File oldDataBackup = new File(path + "chapter_" + Util.toInternalResource(oldTitle) + ".json");
+            oldDataBackup.delete();
+        } catch (IOException e) {
+            Log.create("Error while transferring backup content to new file", "Chapter.rename()", "info", null);
+            newHtmlFile.delete();
+            newNoteFile.delete();
+            newDataBackup.delete();
+            title = oldTitle;
+            return false;
+        }
+
+        chapterRepository.save(this);
+
+        return true;
     }
 
 

@@ -1,5 +1,8 @@
 package dev.jkopecky.draftbook_backend.data;
 
+import java.io.File;
+import java.io.IOException;
+
 public class Util {
 
 
@@ -13,5 +16,20 @@ public class Util {
             }
         }
         return output;
+    }
+
+
+
+
+    public static void recursiveDeleteFiles(String path) throws IOException {
+        File target = new File(path);
+        if (target.isDirectory()) {
+            //call recursively on all children in directory
+            for (File file : target.listFiles()) {
+                recursiveDeleteFiles(file.getPath());
+            }
+        }
+
+        target.delete();
     }
 }

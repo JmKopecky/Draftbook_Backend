@@ -1,5 +1,7 @@
 package dev.jkopecky.draftbook_backend.controllers;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.jkopecky.draftbook_backend.Log;
 import dev.jkopecky.draftbook_backend.data.Util;
 import dev.jkopecky.draftbook_backend.data.tables.*;
@@ -8,8 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -31,9 +35,6 @@ public class WorkController {
 
 
     //note: work wide api calls
-    //todo: following extra ones
-    //rename work
-    //delete work;
 
 
     private Object confirmAuth(String username, String password) {
@@ -63,7 +64,7 @@ public class WorkController {
         //retrieve work
         ArrayList<Work> works = account.getOwnedWorks(workRepository);
         for (Work work : works) {
-            if (Util.toInternalResource(work.getTitle()).equals(target)) {
+            if (work.toResource().equals(target)) {
                 //found the work
                 return work;
             }
@@ -212,6 +213,84 @@ public class WorkController {
         } else {
             response.put("error", workResult);
             return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+        }
+    }
+
+
+
+
+    @GetMapping("/api/works/rename")
+    public ResponseEntity<HashMap<String, Object>> renameWork(
+            @RequestParam(name = "target", required = true) String target,
+            @CookieValue(value = "username", defaultValue = "null") String username,
+            @CookieValue(value = "password", defaultValue = "null") String password,
+            @RequestBody String data) {
+
+        HashMap<String, Object> response = new HashMap<>();
+
+        Account account;
+        Work work;
+        ArrayList<Object> container = getAccountAndWork(username, password, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1);
+        }
+
+        //retrieve response data
+        String newName;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode node = mapper.readTree(data);
+            newName = node.get("newName").asText();
+        } catch (IOException e) {
+            Log.create(e.getMessage(), "WorkController.renameWork()", "error", e);
+            response.put("error", e.getMessage());
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+        boolean result = work.changeName(newName, workRepository);
+        if (result) {
+            response.put("error", "none");
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } else {
+            response.put("error", "rename_failed");
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+
+
+
+    @GetMapping("/api/works/delete")
+    public ResponseEntity<HashMap<String, Object>> deleteWork(
+            @RequestParam(name = "target", required = true) String target,
+            @CookieValue(value = "username", defaultValue = "null") String username,
+            @CookieValue(value = "password", defaultValue = "null") String password) {
+
+        HashMap<String, Object> response = new HashMap<>();
+
+        Account account;
+        Work work;
+        ArrayList<Object> container = getAccountAndWork(username, password, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1);
+        }
+
+        boolean result = work.delete(workRepository);
+        if (result) {
+            response.put("error", "none");
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } else {
+            response.put("error", "delete_failed");
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
     }
 }

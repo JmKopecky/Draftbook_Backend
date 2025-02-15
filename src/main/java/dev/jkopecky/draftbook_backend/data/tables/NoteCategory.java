@@ -36,16 +36,6 @@ public class NoteCategory {
 
 
 
-    public static ArrayList<NoteCategory> getWorkNoteCategories(Work work, NoteCategoryRepository noteCategoryRepository) {
-        ArrayList<NoteCategory> categories = new ArrayList<>();
-        for (NoteCategory noteCategory : noteCategoryRepository.findAll()) {
-            if (noteCategory.work.equals(work)) {
-                categories.add(noteCategory);
-            }
-        }
-        return categories;
-    }
-
 
 
     public static NoteCategory create(NoteCategoryRepository noteCategoryRepository, Work work, String categoryName) throws IOException {
@@ -97,6 +87,24 @@ public class NoteCategory {
 
         noteCategoryRepository.save(category);
         return category;
+    }
+
+
+
+    public String findPath() {
+        return work.getPath() + "notes/" + categoryName;
+    }
+
+
+
+    public static ArrayList<NoteCategory> getWorkNoteCategories(Work work, NoteCategoryRepository noteCategoryRepository) {
+        ArrayList<NoteCategory> categories = new ArrayList<>();
+        for (NoteCategory noteCategory : noteCategoryRepository.findAll()) {
+            if (noteCategory.work.equals(work)) {
+                categories.add(noteCategory);
+            }
+        }
+        return categories;
     }
 
 
@@ -196,10 +204,6 @@ public class NoteCategory {
         }
     }
 
-
-    public String findPath() {
-        return work.getPath() + "notes/" + categoryName;
-    }
 
 
     public Integer getId() {

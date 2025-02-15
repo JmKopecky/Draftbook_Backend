@@ -39,7 +39,7 @@ public class Work {
 
     public void buildPath() {
         //directory should be the user's default root, in a folder based on their name. Changing the username or work name should force a refactor after checking.
-        path = DraftbookBackendApplication.retrieveRoot() + Util.toInternalResource(account.getUsername()) + "/works/" + Util.toInternalResource(title) + "/";
+        path = DraftbookBackendApplication.retrieveRoot() + Util.toInternalResource(account.getUsername()) + "/works/" + id + "/";
     }
 
 
@@ -48,7 +48,7 @@ public class Work {
         try {
             //create initial file based on title, and save the work object for data redundancy.
             ObjectMapper mapper = new ObjectMapper();
-            String fullPath = path + Util.toInternalResource(title) + ".json";
+            String fullPath = path + id + ".json";
             Files.createDirectories(Paths.get(path));
             File file = new File(fullPath);
             mapper.writeValue(file, this);
@@ -155,23 +155,46 @@ public class Work {
 
 
     public String toResource() {
-        return Util.toInternalResource(title);
-        //todo replace usages to rely on path preferably, or an internal name. Title can be changed.
+        return "workid_" + id;
     }
 
 
 
     public boolean changeName(String newName, WorkRepository workRepository) {
-        //todo implement
-        return false;
+        String oldName = title; //save old title in case of error
+
+        try {
+            title = newName;
+            createWorkFile(); //refresh stored copy
+            workRepository.save(this); //save changes to database
+            return true;
+        } catch (IOException e) {
+            title = oldName;
+            try {
+                createWorkFile();
+                workRepository.save(this);
+            } catch (IOException e2) {
+                Log.create(e.getMessage(), "Work.changeName()", "error", e);
+                return false;
+            }
+            Log.create("Failed to change work name from " + oldName + " to " + newName, "Work.changeName()", "info", null);
+            return false;
+        }
     }
 
 
 
     public boolean delete(WorkRepository workRepository) {
-        //todo implement
-        return false;
+        try {
+            Util.recursiveDeleteFiles(this.getPath());
+            workRepository.delete(this);
+        } catch (IOException e) {
+            Log.create("Failed to delete work: " + e.getMessage(), "Work.delete()", "error", e);
+            return false;
+        }
+        return true;
     }
+
 
 
 

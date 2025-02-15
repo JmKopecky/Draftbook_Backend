@@ -63,7 +63,7 @@ public class ChapterController {
         //retrieve work
         ArrayList<Work> works = account.getOwnedWorks(workRepository);
         for (Work work : works) {
-            if (Util.toInternalResource(work.getTitle()).equals(target)) {
+            if (work.toResource().equals(target)) {
                 //found the work
                 return work;
             }
@@ -114,7 +114,7 @@ public class ChapterController {
 
 
 
-
+    //note: inputs {chaptername, chapternumber}
     @PostMapping("/api/works/chapters/create")
     public ResponseEntity<HashMap<String, Object>> createChapter(
             @RequestParam(name = "target", required = true) String target,
@@ -162,7 +162,7 @@ public class ChapterController {
     }
 
 
-
+    //note: inputs {chaptername}
     @PostMapping("/api/works/chapters/select")
     public ResponseEntity<HashMap<String, Object>> selectChapter(
             @RequestParam(name = "target", required = true) String target,
@@ -216,7 +216,7 @@ public class ChapterController {
     }
 
 
-
+    //note: inputs {chaptername}
     @PostMapping("/api/works/chapters/rename")
     public ResponseEntity<HashMap<String, Object>> renameChapter(
             @RequestParam(name = "target", required = true) String target,
@@ -250,11 +250,11 @@ public class ChapterController {
         }
 
         return null; //todo implement
-    } //todo implement
+    }
 
 
 
-
+    //note: inputs {chaptername, content, notes}
     @PostMapping("/api/works/chapters/save")
     public ResponseEntity<HashMap<String, Object>> saveChapter(
             @RequestParam(name = "target", required = true) String target,
@@ -319,7 +319,7 @@ public class ChapterController {
     }
 
 
-
+    //note: inputs {chaptername}
     @PostMapping("/api/works/chapters/delete")
     public ResponseEntity<HashMap<String, Object>> deleteChapter(
             @RequestParam(name = "target", required = true) String target,
@@ -353,5 +353,5 @@ public class ChapterController {
         }
 
         return null; //todo implement
-    } //todo implement
+    }
 }
