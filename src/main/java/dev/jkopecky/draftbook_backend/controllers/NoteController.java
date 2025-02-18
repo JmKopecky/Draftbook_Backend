@@ -5,13 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.jkopecky.draftbook_backend.Log;
 import dev.jkopecky.draftbook_backend.data.Util;
 import dev.jkopecky.draftbook_backend.data.tables.*;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -21,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 @Controller
+@CrossOrigin
 public class NoteController {
 
 

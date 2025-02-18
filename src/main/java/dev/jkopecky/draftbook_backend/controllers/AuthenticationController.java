@@ -9,12 +9,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.HashMap;
 
 @Controller
+@CrossOrigin
 public class AuthenticationController {
 
 
@@ -89,6 +92,8 @@ public class AuthenticationController {
         } catch (Exception e) {
             Log.create(e.getMessage(), "AuthenticationController.exists()", "info", e);
             response.put("error", "authenticate_parse");
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Access-Control-Allow-Origin", "*");
             return new ResponseEntity<>(response, HttpStatus.valueOf(500));
         }
 
