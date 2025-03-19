@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.jkopecky.draftbook_backend.Log;
 import dev.jkopecky.draftbook_backend.data.tables.Account;
 import dev.jkopecky.draftbook_backend.data.tables.AccountRepository;
+import dev.jkopecky.draftbook_backend.data.tables.AuthToken;
+import dev.jkopecky.draftbook_backend.data.tables.AuthTokenRepository;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.HashMap;
+import java.util.UUID;
 
 @Controller
 @CrossOrigin
@@ -23,8 +26,23 @@ public class AuthenticationController {
 
 
     AccountRepository accountRepository;
-    public AuthenticationController(AccountRepository accountRepository) {
+    AuthTokenRepository authTokenRepository;
+    public AuthenticationController(AccountRepository accountRepository, AuthTokenRepository authTokenRepository) {
         this.accountRepository = accountRepository;
+        this.authTokenRepository = authTokenRepository;
+    }
+
+
+
+    public static Account getByToken(String token, AuthTokenRepository authTokenRepository) throws Exception {
+        for (AuthToken authToken : authTokenRepository.findAll()) {
+            if (authToken.getValue().equals(token)) {
+                //token found.
+                return authToken.getAccount();
+            }
+        }
+        //no matching token exists.
+        throw new Exception("No matching token exists.");
     }
 
 
@@ -59,15 +77,22 @@ public class AuthenticationController {
         //todo secure authentication
         Account account = Account.authenticate(username, password, accountRepository);
         if (account != null) { //password was correct, successfully authenticated
+            //delete the old token associated with this account, if any.
+            for (AuthToken token : authTokenRepository.findAll()) {
+                if (token.getAccount().getUsername().equals(account.getUsername())) {
+                    authTokenRepository.delete(token);
+                }
+            }
+            //create a new token for the account.
+            AuthToken token = new AuthToken(account, authTokenRepository);
+
             HttpHeaders cookieHeaders = new HttpHeaders();
-            String usernameCookie = "username=" + username + "; Max-Age=3600;";
-            cookieHeaders.add("Set-Cookie", usernameCookie);
-            String passwordCookie = "password=" + password + "; Max-Age=3600;";
-            cookieHeaders.add("Set-Cookie", passwordCookie);
+            String tokenCookie = "token=" + token.getValue() + "; Max-Age=3600;";
+            cookieHeaders.add("Set-Cookie", tokenCookie);
+
             response.put("error", "none");
             response.put("authenticated", true);
-            response.put("username", username);
-            response.put("password", password); //note: this is a horrible authentication implementation.
+            response.put("token", token.getValue());
             return new ResponseEntity<>(response, cookieHeaders, HttpStatus.OK);
         } else { //incorrect password, reject
             Log.create("Failed to authenticate account " + username + " with password " + password + ".",
@@ -92,8 +117,6 @@ public class AuthenticationController {
         } catch (Exception e) {
             Log.create(e.getMessage(), "AuthenticationController.exists()", "info", e);
             response.put("error", "authenticate_parse");
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("Access-Control-Allow-Origin", "*");
             return new ResponseEntity<>(response, HttpStatus.valueOf(500));
         }
 
@@ -131,17 +154,15 @@ public class AuthenticationController {
 
         //create account
         Account account = Account.create(username, password, accountRepository);
+        AuthToken token = new AuthToken(account, authTokenRepository);
 
         //reply
         response.put("error", "none");
         response.put("authenticated", true);
-        response.put("username", username);
-        response.put("password", password);
+        response.put("token", token.getValue());
         HttpHeaders cookieHeaders = new HttpHeaders();
-        String usernameCookie = "username=" + username + "; Max-Age=3600;";
-        cookieHeaders.add("Set-Cookie", usernameCookie);
-        String passwordCookie = "password=" + password + "; Max-Age=3600;";
-        cookieHeaders.add("Set-Cookie", passwordCookie);
+        String tokenCookie = "token=" + token.getValue() + "; Max-Age=3600;";
+        cookieHeaders.add("Set-Cookie", tokenCookie);
         return new ResponseEntity<>(response, cookieHeaders, HttpStatus.OK);
     }
 }

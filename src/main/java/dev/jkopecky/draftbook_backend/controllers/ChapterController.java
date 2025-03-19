@@ -25,35 +25,13 @@ public class ChapterController {
     WorkRepository workRepository;
     ChapterRepository chapterRepository;
     NoteCategoryRepository noteCategoryRepository;
-    public ChapterController(AccountRepository accountRepository, WorkRepository workRepository, ChapterRepository chapterRepository, NoteCategoryRepository noteCategoryRepository) {
+    AuthTokenRepository authTokenRepository;
+    public ChapterController(AccountRepository accountRepository, WorkRepository workRepository, ChapterRepository chapterRepository, NoteCategoryRepository noteCategoryRepository, AuthTokenRepository authTokenRepository) {
         this.accountRepository = accountRepository;
         this.workRepository = workRepository;
         this.chapterRepository = chapterRepository;
         this.noteCategoryRepository = noteCategoryRepository;
-    }
-
-
-
-
-    private Object confirmAuth(String username, String password) {
-        Account account;
-        //ensure user account identified by cookies exists
-        if (!Account.exists(username, accountRepository)) {
-            account = Account.authenticate(username, password, accountRepository);
-        } else {
-            Log.create("Attempted to access account with an unrecognized username",
-                    "WorkController.getAccount()", "info", null);
-            return "unrecognized_username";
-        }
-
-        //ensure user authentication succeeds
-        if (account == null) {
-            Log.create("Password does not match username",
-                    "WorkController.getWork()", "info", null);
-            return "incorrect_password";
-        }
-
-        return account;
+        this.authTokenRepository = authTokenRepository;
     }
 
 
@@ -76,17 +54,17 @@ public class ChapterController {
 
 
 
-    public ArrayList<Object> getAccountAndWork(String username, String password, String target) {
+    public ArrayList<Object> getAccountAndWork(String token, String target) {
         ArrayList<Object> output = new ArrayList<>();
         String error = "none";
 
         //confirm user credentials
         Account account;
-        Object authResult = confirmAuth(username, password);
-        if (authResult instanceof Account) {
-            account = (Account) authResult;
-        } else {
-            error = "" + authResult;
+        try {
+            account = AuthenticationController.getByToken(token, authTokenRepository);
+        } catch (Exception e) {
+            //failed to retrieve account;
+            error = "Failed to match auth token to account";
             output.add(error);
             return output;
         }
@@ -117,22 +95,13 @@ public class ChapterController {
     @PostMapping("/api/works/chapters/create")
     public ResponseEntity<HashMap<String, Object>> createChapter(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
-        Account account;
+        Account account = null;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
-        }
 
         //retrieve response data
         String chapterName;
@@ -142,11 +111,26 @@ public class ChapterController {
             JsonNode node = mapper.readTree(data);
             chapterName = node.get("chaptername").asText();
             chapterNumber = Integer.parseInt(node.get("chapternumber").asText());
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "ChapterController.createChapter()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
+        }
+
 
         //create chapter
         try {
@@ -165,15 +149,32 @@ public class ChapterController {
     @PostMapping("/api/works/chapters/select")
     public ResponseEntity<HashMap<String, Object>> selectChapter(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
+
+        //retrieve response data
+        String chapterTarget;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode node = mapper.readTree(data);
+            chapterTarget = node.get("chaptername").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
+        } catch (IOException e) {
+            Log.create(e.getMessage(), "ChapterController.selectChapter()", "error", e);
+            response.put("error", e.getMessage());
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
         if (container.size() == 1) {
             response.put("error", container.get(0));
             return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
@@ -182,17 +183,6 @@ public class ChapterController {
             work = (Work) container.get(1);
         }
 
-        //retrieve response data
-        String chapterTarget;
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode node = mapper.readTree(data);
-            chapterTarget = node.get("chaptername").asText();
-        } catch (IOException e) {
-            Log.create(e.getMessage(), "ChapterController.selectChapter()", "error", e);
-            response.put("error", e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        }
 
         try {
             for (Chapter c : work.getChapters(chapterRepository)) {
@@ -219,22 +209,13 @@ public class ChapterController {
     @PostMapping("/api/works/chapters/rename")
     public ResponseEntity<HashMap<String, Object>> renameChapter(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String chapterTarget;
@@ -242,10 +223,24 @@ public class ChapterController {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode node = mapper.readTree(data);
             chapterTarget = node.get("chaptername").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "ChapterController.selectChapter()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1);
         }
 
         return null; //todo implement
@@ -257,22 +252,13 @@ public class ChapterController {
     @PostMapping("/api/works/chapters/save")
     public ResponseEntity<HashMap<String, Object>> saveChapter(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String chapterTitle;
@@ -284,11 +270,27 @@ public class ChapterController {
             chapterTitle = node.get("chaptername").asText();
             content = node.get("content").asText();
             notes = node.get("notes").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "ChapterController.saveChapter()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1);
+        }
+
 
         //save chapter
         try {
@@ -322,15 +324,33 @@ public class ChapterController {
     @PostMapping("/api/works/chapters/delete")
     public ResponseEntity<HashMap<String, Object>> deleteChapter(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
+
+        //retrieve response data
+        String chapterTarget;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode node = mapper.readTree(data);
+            chapterTarget = node.get("chaptername").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
+        } catch (IOException e) {
+            Log.create(e.getMessage(), "ChapterController.deleteChapter()", "error", e);
+            response.put("error", e.getMessage());
+            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
         if (container.size() == 1) {
             response.put("error", container.get(0));
             return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
@@ -339,17 +359,6 @@ public class ChapterController {
             work = (Work) container.get(1);
         }
 
-        //retrieve response data
-        String chapterTarget;
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode node = mapper.readTree(data);
-            chapterTarget = node.get("chaptername").asText();
-        } catch (IOException e) {
-            Log.create(e.getMessage(), "ChapterController.deleteChapter()", "error", e);
-            response.put("error", e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        }
 
         return null; //todo implement
     }

@@ -29,36 +29,16 @@ public class NoteController {
     WorkRepository workRepository;
     ChapterRepository chapterRepository;
     NoteCategoryRepository noteCategoryRepository;
-    public NoteController(AccountRepository accountRepository, WorkRepository workRepository, ChapterRepository chapterRepository, NoteCategoryRepository noteCategoryRepository) {
+    AuthTokenRepository authTokenRepository;
+    public NoteController(AccountRepository accountRepository, WorkRepository workRepository, ChapterRepository chapterRepository, NoteCategoryRepository noteCategoryRepository, AuthTokenRepository authTokenRepository) {
         this.accountRepository = accountRepository;
         this.workRepository = workRepository;
         this.chapterRepository = chapterRepository;
         this.noteCategoryRepository = noteCategoryRepository;
+        this.authTokenRepository = authTokenRepository;
     }
 
 
-
-
-    private Object confirmAuth(String username, String password) {
-        Account account;
-        //ensure user account identified by cookies exists
-        if (!Account.exists(username, accountRepository)) {
-            account = Account.authenticate(username, password, accountRepository);
-        } else {
-            Log.create("Attempted to access account with an unrecognized username",
-                    "WorkController.getAccount()", "info", null);
-            return "unrecognized_username";
-        }
-
-        //ensure user authentication succeeds
-        if (account == null) {
-            Log.create("Password does not match username",
-                    "WorkController.getWork()", "info", null);
-            return "incorrect_password";
-        }
-
-        return account;
-    }
 
 
 
@@ -80,17 +60,17 @@ public class NoteController {
 
 
 
-    public ArrayList<Object> getAccountAndWork(String username, String password, String target) {
+    public ArrayList<Object> getAccountAndWork(String token, String target) {
         ArrayList<Object> output = new ArrayList<>();
         String error = "none";
 
         //confirm user credentials
         Account account;
-        Object authResult = confirmAuth(username, password);
-        if (authResult instanceof Account) {
-            account = (Account) authResult;
-        } else {
-            error = "" + authResult;
+        try {
+            account = AuthenticationController.getByToken(token, authTokenRepository);
+        } catch (Exception e) {
+            //failed to retrieve account;
+            error = "Failed to match auth token to account";
             output.add(error);
             return output;
         }
@@ -118,22 +98,13 @@ public class NoteController {
     @PostMapping("/api/works/notecategories/create")
     public ResponseEntity<HashMap<String, Object>> createCategory(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -141,12 +112,27 @@ public class NoteController {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode node = mapper.readTree(data);
             noteCategoryName = node.get("noteCategoryName").asText();
-
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.createCategory()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
+        }
+
 
         try {
             NoteCategory.create(noteCategoryRepository, work, noteCategoryName);
@@ -164,22 +150,13 @@ public class NoteController {
     @PostMapping("/api/works/notecategories/rename")
     public ResponseEntity<HashMap<String, Object>> renameCategory(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -187,11 +164,25 @@ public class NoteController {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode node = mapper.readTree(data);
             noteCategoryName = node.get("noteCategoryName").asText();
-
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.renameCategory()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
         //todo implement
@@ -206,22 +197,13 @@ public class NoteController {
     @PostMapping("/api/works/notecategories/delete")
     public ResponseEntity<HashMap<String, Object>> deleteCategory(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -229,12 +211,28 @@ public class NoteController {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode node = mapper.readTree(data);
             noteCategoryName = node.get("noteCategoryName").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
 
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.deleteCategory()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
+        }
+
 
         //find the noteCategory and delete it
         for (NoteCategory cat : NoteCategory.getWorkNoteCategories(work, noteCategoryRepository)) {
@@ -274,22 +272,13 @@ public class NoteController {
     @PostMapping("/api/works/notes/create")
     public ResponseEntity<HashMap<String, Object>> createNote(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -299,10 +288,25 @@ public class NoteController {
             JsonNode node = mapper.readTree(data);
             noteCategoryName = node.get("noteCategoryName").asText();
             noteName = node.get("noteName").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.createNote()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
 
@@ -330,22 +334,13 @@ public class NoteController {
     @PostMapping("/api/works/notes/select")
     public ResponseEntity<HashMap<String, Object>> selectNote(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -355,10 +350,25 @@ public class NoteController {
             JsonNode node = mapper.readTree(data);
             noteCategoryName = node.get("noteCategoryName").asText();
             noteName = node.get("noteName").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.selectNote()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
 
@@ -374,22 +384,13 @@ public class NoteController {
     @PostMapping("/api/works/notes/rename")
     public ResponseEntity<HashMap<String, Object>> renameNote(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -401,11 +402,27 @@ public class NoteController {
             noteCategoryName = node.get("noteCategoryName").asText();
             noteName = node.get("noteName").asText();
             newNoteName = node.get("newNoteName").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.renameNote()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
+        }
+
 
         for (NoteCategory cat : NoteCategory.getWorkNoteCategories(work, noteCategoryRepository)) {
             if (cat.getCategoryName().equals(noteCategoryName)) {
@@ -435,22 +452,13 @@ public class NoteController {
     @PostMapping("/api/works/notes/save")
     public ResponseEntity<HashMap<String, Object>> saveNote(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -460,10 +468,25 @@ public class NoteController {
             JsonNode node = mapper.readTree(data);
             noteCategoryName = node.get("noteCategoryName").asText();
             noteName = node.get("noteName").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.saveNote()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
 
@@ -479,22 +502,13 @@ public class NoteController {
     @PostMapping("/api/works/notes/delete")
     public ResponseEntity<HashMap<String, Object>> deleteNote(
             @RequestParam(name = "target") String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
-        if (container.size() == 1) {
-            response.put("error", container.get(0));
-            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        } else {
-            account = (Account) container.get(0);
-            work = (Work) container.get(1);
-        }
 
         //retrieve response data
         String noteCategoryName;
@@ -504,11 +518,27 @@ public class NoteController {
             JsonNode node = mapper.readTree(data);
             noteCategoryName = node.get("noteCategoryName").asText();
             noteName = node.get("noteName").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "NoteController.deleteNote()", "error", e);
             response.put("error", e.getMessage());
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
         }
+
+
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
+            return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
+        }
+
 
         for (NoteCategory cat : NoteCategory.getWorkNoteCategories(work, noteCategoryRepository)) {
             if (cat.getCategoryName().equals(noteCategoryName)) {

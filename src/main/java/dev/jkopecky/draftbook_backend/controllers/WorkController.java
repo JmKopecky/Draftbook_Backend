@@ -24,38 +24,19 @@ public class WorkController {
     WorkRepository workRepository;
     ChapterRepository chapterRepository;
     NoteCategoryRepository noteCategoryRepository;
-    public WorkController(AccountRepository accountRepository, WorkRepository workRepository, ChapterRepository chapterRepository, NoteCategoryRepository noteCategoryRepository) {
+    AuthTokenRepository authTokenRepository;
+    public WorkController(AccountRepository accountRepository, WorkRepository workRepository, ChapterRepository chapterRepository, NoteCategoryRepository noteCategoryRepository, AuthTokenRepository authTokenRepository) {
         this.accountRepository = accountRepository;
         this.workRepository = workRepository;
         this.chapterRepository = chapterRepository;
         this.noteCategoryRepository = noteCategoryRepository;
+        this.authTokenRepository = authTokenRepository;
     }
 
 
 
     //note: work wide api calls
 
-
-    private Object confirmAuth(String username, String password) {
-        Account account;
-        //ensure user account identified by cookies exists
-        if (!Account.exists(username, accountRepository)) {
-            account = Account.authenticate(username, password, accountRepository);
-        } else {
-            Log.create("Attempted to access account with an unrecognized username",
-                    "WorkController.getAccount()", "info", null);
-            return "unrecognized_username";
-        }
-
-        //ensure user authentication succeeds
-        if (account == null) {
-            Log.create("Password does not match username",
-                    "WorkController.getWork()", "info", null);
-            return "incorrect_password";
-        }
-
-        return account;
-    }
 
 
 
@@ -77,17 +58,17 @@ public class WorkController {
 
 
 
-    public ArrayList<Object> getAccountAndWork(String username, String password, String target) {
+    public ArrayList<Object> getAccountAndWork(String token, String target) {
         ArrayList<Object> output = new ArrayList<>();
         String error = "none";
 
         //confirm user credentials
         Account account;
-        Object authResult = confirmAuth(username, password);
-        if (authResult instanceof Account) {
-            account = (Account) authResult;
-        } else {
-            error = "" + authResult;
+        try {
+            account = AuthenticationController.getByToken(token, authTokenRepository);
+        } catch (Exception e) {
+            //failed to retrieve account;
+            error = "Failed to match auth token to account";
             output.add(error);
             return output;
         }
@@ -113,32 +94,25 @@ public class WorkController {
     @GetMapping("/api/works/work")
     public ResponseEntity<HashMap<String, Object>> getWork(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password) {
+            @CookieValue(value = "token", defaultValue = "null") String token) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
-
-        //confirm user credentials
-        Object authResult = confirmAuth(username, password);
-        if (authResult instanceof Account) {
-            account = (Account) authResult;
-        } else {
-            response.put("error", authResult);
+        Work work;
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
             return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
-        //retrieve work
-        Object workResult = getTargetWork(target, account);
-        if (workResult instanceof Work work) {
-            response.put("error", "none");
-            response.put("work", work); //todo test that this works correctly, sending the work object in json format to the client
-            return new ResponseEntity<>(response, HttpStatus.OK);
-        } else {
-            response.put("error", workResult);
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
-        }
+        response.put("error", "none");
+        response.put("work", work); //todo test that this works correctly, sending the work object in json format to the client
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
 
@@ -146,32 +120,25 @@ public class WorkController {
     @GetMapping("/api/works/chapters")
     public ResponseEntity<HashMap<String, Object>> getChapters(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password) {
+            @CookieValue(value = "token", defaultValue = "null") String token) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
-
-        //confirm user credentials
-        Object authResult = confirmAuth(username, password);
-        if (authResult instanceof Account) {
-            account = (Account) authResult;
-        } else {
-            response.put("error", authResult);
+        Work work;
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
             return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+        } else {
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
-        //retrieve work
-        Object workResult = getTargetWork(target, account);
-        if (workResult instanceof Work work) {
-            response.put("error", "none");
-            response.put("chapters", work.getChapters(chapterRepository)); //todo test that this works correctly
-            return new ResponseEntity<>(response, HttpStatus.OK);
-        } else {
-            response.put("error", workResult);
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
-        }
+        response.put("error", "none");
+        response.put("chapters", work.getChapters(chapterRepository)); //todo test that this works correctly
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
 
@@ -179,40 +146,33 @@ public class WorkController {
     @GetMapping("/api/works/notecategories")
     public ResponseEntity<HashMap<String, Object>> getNotes(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password) {
+            @CookieValue(value = "token", defaultValue = "null") String token) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
-
-        //confirm user credentials
-        Object authResult = confirmAuth(username, password);
-        if (authResult instanceof Account) {
-            account = (Account) authResult;
-        } else {
-            response.put("error", authResult);
+        Work work;
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
+        if (container.size() == 1) {
+            response.put("error", container.get(0));
             return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
-        }
-
-        //retrieve work
-        Object workResult = getTargetWork(target, account);
-        if (workResult instanceof Work work) {
-            ArrayList<NoteCategory> noteCategories = new ArrayList<>();
-            for (NoteCategory nc : noteCategoryRepository.findAll()) {
-                if (nc.getWork().equals(work)) {
-                    noteCategories.add(nc);
-                }
-            }
-
-            //retrieve chapters and reply
-            response.put("error", "none");
-            response.put("notecategories", noteCategories); //todo test that this works correctly
-            return new ResponseEntity<>(response, HttpStatus.OK);
         } else {
-            response.put("error", workResult);
-            return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+            account = (Account) container.get(0);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
+
+        ArrayList<NoteCategory> noteCategories = new ArrayList<>();
+        for (NoteCategory nc : noteCategoryRepository.findAll()) {
+            if (nc.getWork().equals(work)) {
+                noteCategories.add(nc);
+            }
+        }
+
+        //retrieve chapters and reply
+        response.put("error", "none");
+        response.put("notecategories", noteCategories); //todo test that this works correctly
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
 
@@ -221,21 +181,21 @@ public class WorkController {
     @GetMapping("/api/works/rename")
     public ResponseEntity<HashMap<String, Object>> renameWork(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password,
+            @CookieValue(value = "token", defaultValue = "null") String token,
             @RequestBody String data) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
         if (container.size() == 1) {
             response.put("error", container.get(0));
             return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
         } else {
             account = (Account) container.get(0);
-            work = (Work) container.get(1);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
         //retrieve response data
@@ -244,6 +204,10 @@ public class WorkController {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode node = mapper.readTree(data);
             newName = node.get("newName").asText();
+            //token verification if included in request body
+            if (node.has("token")) {
+                token = node.get("token").asText();
+            }
         } catch (IOException e) {
             Log.create(e.getMessage(), "WorkController.renameWork()", "error", e);
             response.put("error", e.getMessage());
@@ -267,20 +231,20 @@ public class WorkController {
     @GetMapping("/api/works/delete")
     public ResponseEntity<HashMap<String, Object>> deleteWork(
             @RequestParam(name = "target", required = true) String target,
-            @CookieValue(value = "username", defaultValue = "null") String username,
-            @CookieValue(value = "password", defaultValue = "null") String password) {
+            @CookieValue(value = "token", defaultValue = "null") String token) {
 
         HashMap<String, Object> response = new HashMap<>();
 
         Account account;
         Work work;
-        ArrayList<Object> container = getAccountAndWork(username, password, target);
+        //auth
+        ArrayList<Object> container = getAccountAndWork(token, target);
         if (container.size() == 1) {
             response.put("error", container.get(0));
             return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
         } else {
             account = (Account) container.get(0);
-            work = (Work) container.get(1);
+            work = (Work) container.get(1); //todo see if this can be adapted to the above get mappings to reduce boilerplate.
         }
 
         boolean result = work.delete(workRepository);
